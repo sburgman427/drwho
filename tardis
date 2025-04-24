@@ -1,0 +1,69 @@
+devtools::install_github("KittJonathan/datardis")
+install.packages("ggplot2")
+library(datardis)
+library(tidyverse)
+
+data(package = "datardis")
+data <- drwho_episodes
+head(data)
+
+character_episodes <- list(
+  Dalek = c("Dalek", "Bad Wolf", "The Parting of Ways", "Army of Ghosts", "Doomsday", "Daleks in Manhattan", "Evolution of the Daleks", "The Stolen Earth", "Journey's End", "The Beast Below", "Victory of the Daleks", "The Time of the Doctor", "Into the Dalek", "The Magician's Apprentice", "The Pilot", "Resolution", "Asylum of the Daleks", "Eve of the Daleks", "Revolution of the Daleks", "The Waters of Mars", "The Pandorica Opens", "The Big Bang", "The Wedding of River Song", "The Last Day", "The Day of the Doctor", "Hell Bent", "Friend from the Future", "The Lie of the Land", "Twice Upon a Time", "Resolution", "Once, Upon Time", "The Vanquishers", "The Power of the Doctor", "Destination: Skaro"), 
+  Cyberman = c("Children in Need", "Dalek", "Rise of the Cyberman", "The Age of Steel", "Army of Ghosts", "Doomsday", "The Next Doctor", "The Pandorica Opens", "The Big Bang", "A Good Man Goes to War", "Closing Time", "Nightmare in Silver", "The Day of the Doctor", "The Time of the Doctor", "Dark Water", "Death in Heaven", "Face the Raven", "Hell Bent", "The Lie of the Land", "World Enough and Time", "The Doctor Falls", "The Haunting of Villa Diodati", "Ascension of the Cyberman", "The Timeless Children", "Revolution of the Daleks", "Once, Upon Time", "The Vanquishers", "The Power of the Doctor"), 
+  Weeping_Angel = c("Blink", "The Time of Angels", "Flesh and Stone", "The God Complex","The Angels Take Manhattan", "The Time of the Doctor", "Hell Bent", "The Lie of the Land", "Revolution of the Daleks", "The Halloween Apocalypse", "Once, Upon Time", "Village of the Angels", "Survivors of the Flux"), 
+  Ood = c("The Impossible Planet", "The Satan Pit","Planet of the Ood", "The Waters of Mars", "The End of Time", "The Doctor's Wife", "The Magician's Apprentice", "Face the Raven", "Hell Bent", "Revolution of the Daleks", "Survivors of the Flux", "The Vanquishers") 
+)
+all_episodes <- unlist(character_episodes)
+filtered_data <- data %>%
+  filter(episode_title %in% all_episodes)
+head(filtered_data)
+
+character_summary <- tibble(
+  character = names(character_episodes),
+  appearances = sapply(character_episodes, function(x) sum(filtered_data$episode_title %in% x)), avg_rating = sapply(character_episodes, function(x) mean(as.numeric(filtered_data$rating[filtered_data$episode_title %in% x]), na.rm = T))
+)
+character_summary
+
+character_colors <- character_summary %>%
+  mutate(
+    color = case_when(
+  character == "Dalek" ~ "#DAA520",
+    character  == "Cyberman" ~ "steelblue",
+    character  == "Weeping Angel" ~ "#F2F3F5",
+  character  == "Ood" ~ "#A52A2A",
+  T ~ "#D3D3D3"
+)
+)
+
+install.packages("gganimate")
+install.packages("gifski")
+install.packages("transformr")
+
+library(gganimate)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+character_df <- enframe(character_episodes, name = "character", value = "episode_title") %>%
+  unnest(episode_title)
+episode_character_ratings <- character_df %>%
+  left_join(data, by = c("episode_title")) %>%
+  mutate(
+    rating = as.numeric(rating),
+    episode_number = as.numeric(episode_number)
+  ) %>%
+  arrange(character, episode_number) %>%
+  filter(!is.na(rating), !is.na(episode_number))
+
+character_colors <- scales::hue_pal()(length(unique(episode_character_ratings$character)))
+
+names(character_colors) <- unique(episode_character_ratings$character)
+
+animated_plot <- ggplot(episode_character_ratings, aes(x = episode_number, y = rating, color = character)) + geom_line(linewidth = 1.2, show.legend = T) +
+  geom_point(size = 2) +
+  scale_color_manual(values = character_colors) +
+labs( title = "Doctor Who Ratings by Character Over Time", subtitle = "Episode Number: {frame_time}", x = "Episode Number", y = "Rating") + theme_minimal(base_family = "Times New Roman") + theme(plot.title = element_text(size = 18, hjust = 0.5), plot.subtitle = element_text(size = 14, hjust = 0.5), legend.title = element_blank()
+) +
+  gganimate::transition_time(episode_number) + gganimate::ease_aes('linear')
+
+animate(animated_plot, renderer = gifski_renderer(), width = 900, height = 600, fps = 10, duration = 8)
